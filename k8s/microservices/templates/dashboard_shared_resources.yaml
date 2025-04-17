@@ -1,28 +1,38 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.sharedServices.namespace }}
+
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: secrets-sa
-  namespace: {{ .Values.ubuntuworker.namespace }}
+  namespace: {{ .Values.sharedServices.namespace }}
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::{{ .Values.awsAccountNumber }}:role/{{ .Values.ubuntuworker.iamRole.name }}
+    eks.amazonaws.com/role-arn: arn:aws:iam::{{ .Values.awsAccountNumber }}:role/{{ .Values.sharedServices.iamRole.name }}
 
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ .Values.ubuntuworker.name }}-s3-pv
-  namespace: {{ .Values.ubuntuworker.namespace }}
+  name: {{ .Values.sharedServices.name }}-s3-pv
+  namespace: {{ .Values.sharedServices.namespace }}
 spec:
   capacity:
     storage: {{ .Values.global.s3.storage.size }}
   volumeMode: Filesystem
   accessModes:
 {{ toYaml .Values.global.s3.storage.accessModes | indent 4 }}
+  mountOptions:
+    - allow-delete
+    - allow-other
+    - allow-overwrite
   persistentVolumeReclaimPolicy: {{ .Values.global.s3.storage.reclaimPolicy }}
   storageClassName: {{ .Values.global.s3.storage.storageClassName }}
   csi:
     driver: s3.csi.aws.com
-    volumeHandle: s3-csi-{{ .Values.ubuntuworker.name }}-mount
+    volumeHandle: s3-csi-{{ .Values.sharedServices.name }}-mount
     volumeAttributes:
       bucketName: {{ .Values.global.s3.bucketName }}
       mounter: s3fs
@@ -32,8 +42,8 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Values.ubuntuworker.name }}-s3-pvc
-  namespace: {{ .Values.ubuntuworker.namespace }}
+  name: {{ .Values.sharedServices.name }}-s3-pvc
+  namespace: {{ .Values.sharedServices.namespace }}
 spec:
   accessModes:
 {{ toYaml .Values.global.s3.storage.accessModes | indent 4 }}
@@ -41,14 +51,14 @@ spec:
     requests:
       storage: {{ .Values.global.s3.storage.size }}
   storageClassName: {{ .Values.global.s3.storage.storageClassName }}
-  volumeName: {{ .Values.ubuntuworker.name }}-s3-pv
+  volumeName: {{ .Values.sharedServices.name }}-s3-pv
 
 ---
 apiVersion: secrets-store.csi.x-k8s.io/v1
 kind: SecretProviderClass
 metadata:
-  name: {{ .Values.ubuntuworker.secretProviderClass.name }}
-  namespace: {{ .Values.ubuntuworker.namespace }}
+  name: {{ .Values.sharedServices.secretProviderClass.name }}
+  namespace: {{ .Values.sharedServices.namespace }}
 spec:
   provider: aws
   parameters:
@@ -57,26 +67,26 @@ spec:
         objectType: secretsmanager
         jmesPath:
           - path: "jwt_secret"
-            objectAlias: "{{ .Values.ubuntuworker.secret.jwtSecretKey }}"
+            objectAlias: "{{ .Values.sharedServices.secret.jwtSecretKey }}"
   secretObjects:
     - secretName: {{ .Values.global.secret.name }}
       type: Opaque
       data:
-        - objectName: "{{ .Values.ubuntuworker.secret.jwtSecretKey }}"
+        - objectName: "{{ .Values.sharedServices.secret.jwtSecretKey }}"
           key: jwt_secret
 
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ .Values.ubuntuworker.name }}-pod
-  namespace: {{ .Values.ubuntuworker.namespace }}
+  name: {{ .Values.sharedServices.name }}-pod
+  namespace: {{ .Values.sharedServices.namespace }}
 spec:
   serviceAccountName: secrets-sa
   restartPolicy: Always
   containers:
-    - name: {{ .Values.ubuntuworker.name }}
-      image: {{ .Values.ubuntuworker.image.repository }}:{{ .Values.ubuntuworker.image.tag }}
+    - name: {{ .Values.sharedServices.name }}
+      image: {{ .Values.sharedServices.image.repository }}:{{ .Values.sharedServices.image.tag }}
       command: ["/bin/bash", "-c", "--"]
       args: ["while true; do sleep 3600; done;"]
       volumeMounts:
@@ -90,21 +100,21 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.global.secret.name }}
-              key: {{ .Values.ubuntuworker.secret.jwtSecretKey }}
+              key: {{ .Values.sharedServices.secret.jwtSecretKey }}
       resources:
         requests:
-          cpu: "{{ .Values.ubuntuworker.resources.requests.cpu }}"
-          memory: "{{ .Values.ubuntuworker.resources.requests.memory }}"
+          cpu: "{{ .Values.sharedServices.resources.requests.cpu }}"
+          memory: "{{ .Values.sharedServices.resources.requests.memory }}"
         limits:
-          cpu: "{{ .Values.ubuntuworker.resources.limits.cpu }}"
-          memory: "{{ .Values.ubuntuworker.resources.limits.memory }}"
+          cpu: "{{ .Values.sharedServices.resources.limits.cpu }}"
+          memory: "{{ .Values.sharedServices.resources.limits.memory }}"
   volumes:
     - name: s3-volume
       persistentVolumeClaim:
-        claimName: {{ .Values.ubuntuworker.name }}-s3-pvc
+        claimName: {{ .Values.sharedServices.name }}-s3-pvc
     - name: secrets-store-inline
       csi:
         driver: secrets-store.csi.k8s.io
         readOnly: true
         volumeAttributes:
-          secretProviderClass: {{ .Values.ubuntuworker.secretProviderClass.name }}
+          secretProviderClass: {{ .Values.sharedServices.secretProviderClass.name }}

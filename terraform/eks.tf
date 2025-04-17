@@ -48,7 +48,7 @@ module "csi_irsa_role_secrets" {
   oidc_providers = {
     ex = {
       provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["default:secrets-sa"]
+      namespace_service_accounts = ["dashboard:secrets-sa"]
     }
   }
 }
@@ -111,7 +111,7 @@ module "eks" {
 
       min_size     = 1
       max_size     = 3
-      desired_size = 1
+      desired_size = 2
 
       use_latest_ami_release_version = true
 

@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.secDownload.name }}-cronjob
+  namespace: {{ .Values.secDownload.namespace }}
+spec:
+  schedule: {{ .Values.secDownload.schedule }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: {{ .Values.secDownload.name }}
+            image: "{{ .Values.secDownload.image.repository }}:{{ .Values.secDownload.image.tag }}"
+            imagePullPolicy: {{ .Values.secDownload.image.pullPolicy }}
+            env:
+            {{- range $key, $value := .Values.secDownload.env }}
+              - name: {{ $key }}
+                value: "{{ $value }}"
+            {{- end }}
+            volumeMounts:
+            - name: s3-volume
+              mountPath: /s3_mount
+          volumes:
+          - name: s3-volume
+            persistentVolumeClaim:
+              claimName: {{ .Values.secDownload.name }}-s3-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.secDownload.name }}-s3-pv
+  namespace: {{ .Values.secDownload.namespace }}
+spec:
+  capacity:
+    storage: {{ .Values.global.s3.storage.size }}
+  accessModes:
+{{ toYaml .Values.global.s3.storage.accessModes | indent 4 }}
+  mountOptions:
+    - allow-delete
+    - allow-other
+    - allow-overwrite
+  persistentVolumeReclaimPolicy: {{ .Values.global.s3.storage.reclaimPolicy }}
+  storageClassName: {{ .Values.global.s3.storage.storageClassName }}
+  csi:
+    driver: s3.csi.aws.com
+    volumeHandle: s3-csi-{{ .Values.secDownload.name }}-s3-mount
+    volumeAttributes:
+      bucketName: {{ .Values.global.s3.bucketName }}
+      mounter: s3fs
+      csi.storage.k8s.io/nodePublishSecretName: ""
+      csi.storage.k8s.io/nodePublishSecretNamespace: ""
+      authType: "pod"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.secDownload.name }}-s3-pvc
+  namespace: {{ .Values.secDownload.namespace }}
+spec:
+  accessModes:
+{{ toYaml .Values.global.s3.storage.accessModes | indent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.global.s3.storage.size }}
+  storageClassName: {{ .Values.global.s3.storage.storageClassName }}
+  volumeName: {{ .Values.secDownload.name }}-s3-pv
