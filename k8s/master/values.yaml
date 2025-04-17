@@ -1,0 +1,9 @@
+appEnvironments:
+  dev:
+    argoHostname: argocd-cloud-financial-dashboard.brewsentry.com
+    awsAccountNumber: '704855531002'
+    clusterName: cloud-financial-dashboard
+    environment: cloud-financial-dashboard
+    publicDomain: brewsentry.com
+    publicDomainId: Z02805682TXYB0368277R
+    repoUrl: https://github.com/semperfitodd/financial_dashboard.git

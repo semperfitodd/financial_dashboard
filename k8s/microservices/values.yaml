@@ -1,0 +1,33 @@
+global:
+  s3:
+    bucketName: cloud-financial-dashboard-sec-filings-r87t
+    storage:
+      size: 100Gi
+      accessModes:
+        - ReadWriteMany
+      reclaimPolicy: Retain
+      storageClassName: s3-sc
+
+  secret:
+    name: cloud-financial-dashboard-lambda-auth-secret
+
+ubuntuworker:
+  name: ubuntu-worker
+  namespace: default
+  image:
+    repository: ubuntu
+    tag: "22.04"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  iamRole:
+    name: cloud_financial_dashboard_secrets_csi
+  secret:
+    jwtSecretKey: jwt_secret
+  secretProviderClass:
+    name: aws-secrets-provider
